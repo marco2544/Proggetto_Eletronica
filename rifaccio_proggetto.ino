@@ -1,0 +1,349 @@
+//libreria servomotore
+#include <ESP32Servo.h>
+//libreria Preferences (funziona per salvare le variabili in memoria)
+#include <Preferences.h>
+//Libreria standard per utilizzare i2c
+#include <Wire.h>
+//libreria accelerometro
+#include <DFRobot_BMI160.h>
+
+//creo l'oggetto accelerometro (per poter ricavare le informazioni da esso)
+DFRobot_BMI160 bmi160;
+
+const int8_t i2c_addr = 0x69;
+//creo l'oggetto servomotore (per dare i comandi)
+Servo myServo;
+//creo l'oggetto per le preferences per salvare in memoria le variabili (funziona come una sorta di hasmap)
+Preferences preferences;
+
+//constanti pin sensori
+//pin per il servo
+const int pinServo  = 14;
+
+//costanti  varie per la gestione degli input
+const String EXIT = "ESC";
+const String FINE = "FINE";
+
+// costante per la conversione in m/s^2 
+const float accScale = 9.81 / 16384.0; 
+
+//variabili per l'accelerometro
+int8_t rslt;
+int16_t accelGyro[6] = {0};
+
+//variabile per il servo memoriza la posizione del servomotore
+float currentPosition = 0.0;
+
+const int CAMPIONAMENTO = 50;
+unsigned long stop = 0;
+unsigned long intervallo = 0;
+
+
+// filtro passa-alto per la pulizzia del segnale
+float alpha = 0.9; 
+float ax_filtered = 0,
+      ay_filtered = 0, 
+      az_filtered = 0;
+float ax_last = 0, 
+      ay_last = 0, 
+      az_last = 0;
+
+
+//matrice per i tempi espressi ms per i ms che il servo impiega a fare 1 grado a quella velocità
+float msPerDegreeTable[10] = { 24, 20, 16, 12, 10, 8, 6, 5, 4, 3 };
+
+//velocità impostate del servomotore
+//                      1     2     3     4     5    6     7     8     9     10
+int pwmTable[22] =  { 1400, 1300, 1200, 1100, 1000, 900,  800,  700,  600,  500,
+                      1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500,
+//                     11    12    13    14    15    16    17    18    19    20
+                      1566, 1435};
+//                    or    anor
+
+void setup() {
+  //inizializza porta seriale
+  Serial.begin(115200);
+  delay(100);
+
+  //controllo che l'accelerometro funziona
+  if (bmi160.softReset() != BMI160_OK) {
+    Serial.println("reset false");
+    while (true);
+  }
+
+  if (bmi160.I2cInit(i2c_addr) != BMI160_OK) {
+    Serial.println("init false");
+    while (true);
+  }
+
+  //inizializza il servomotore con ([pin_del_servo], [velocità_minima], [velocità_massima])
+  myServo.attach(pinServo, 500, 2500); 
+  //nizializza memoria
+  currentPosition = preferences.getFloat("position", 0.0);
+
+}
+
+
+void loop() {
+
+  //aspetto 3 secondi da un esecuzione più che altro perchè altrimenti all'avvio non stampa il menu
+  delay(3000);
+  
+  // Legge la riga fino a INVIO
+  String comando=leggi("Inserisci (1)-MUOVI (2)-CALIBRA (3)-VAI IN HOME");
+  //converte in intero il comando scelto
+  int scelta=comando.toInt();
+  //debug 
+  
+  Serial.print("selezione: ");
+  Serial.print(scelta);
+  Serial.print(" inserito: ");
+  Serial.println(comando);
+  
+  comando.clear();
+  switch(scelta){
+    case 1:
+      muovi();
+      break;
+
+    case 2:
+    //calibro la posizione 0
+      calibro();
+      break;
+
+    case 3:
+    //faccio in modo che l'utente possa resettare la posizione del braccio
+      rth();
+      break;
+
+    default:
+
+      Serial.println("Valore non valido");
+      break;
+
+  }
+  
+  //qui andranno i dati dell'acelerometro
+}
+
+
+void rth(){
+  //torno alla posizione 0
+  ruota(-(currentPosition),20);
+}
+
+
+void muovi(){
+  while(true){
+    //prendo in input di quanti gradi devo ruotare e la velocità
+    String comando = leggi("Inserisci [gradi] [velocita (1-10)] e premi INVIO (es. 90 5)  scrivi ESC per uscire:");
+
+    //se l'utente scrive ESC torno al menu principale
+    if(comando.equalsIgnoreCase(EXIT)){
+      comando.clear();
+      return;
+    }
+
+    imposta_rotazione(comando);
+    //pulisco il comando
+    comando.clear();
+  }
+}
+
+
+void calibro(){
+  while(true){
+    //chiedo all'utente in che verso devo muovermi e chiemo imposta 0
+    String comando = leggi("(+)Orario (-)antiorario (FINE)imposta lo 0");
+    if(comando.equalsIgnoreCase(FINE)){
+      currentPosition = 0;
+      preferences.putFloat("position", currentPosition);
+      return;
+    }
+    imposta_Zero(comando);
+    comando.clear();
+  }
+}
+
+
+void imposta_Zero(String verso){
+  //in base al verso mi muovo di tot° per dare agio di ripristinadre lo 0
+  if(verso.equalsIgnoreCase("+")){
+    ruota(5,1);
+  }
+  else if (verso.equalsIgnoreCase("-")){
+    ruota(-5,1);
+  }
+
+}
+
+
+void errore(){
+  Serial.println("Formato errato");
+}
+
+
+String leggi(String prompt) {
+  Serial.println(prompt);
+  Serial.print("> ");
+
+  while (true) {
+    if (Serial.available() > 0) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();  // rimuove spazi e newline
+      if (input.length() > 0) {
+        return input;
+      }
+    }
+  }
+}
+
+
+void imposta_rotazione(String dati){
+  //debug
+  Serial.println(dati);
+ 
+  //controllo comando non sia vuoto
+  if (dati.length() == 0){
+    return;
+  }
+
+  // Divide input in gradi e velocità
+  int spazzi = dati.indexOf(' ');
+
+  //che ci sia uno spazio tra uno e l'altro
+  if (spazzi == -1)  {
+    dati.clear();
+    //funzione che stampa errore
+    errore();
+    return;
+  }
+
+  //divido la stringa per i vari dati ([gradi] [velocità])
+  int degrees = dati.substring(0, spazzi).toInt();
+  int vel = dati.substring(spazzi + 1).toInt();
+
+  //controllo che la velocità abbia il giusto range
+  if ((vel < 1 || vel > 10) ) {
+    dati.clear();
+    //funzione che stampa errore
+    errore();
+    return;
+  }
+
+  // Muove il servo
+  ruota(degrees, vel);
+
+  //stampo i gradi e la velocità 
+  //debug
+  Serial.print("Gradi: ");
+  Serial.print(degrees);
+  Serial.print(" Velocita: ");
+  Serial.println(vel);
+
+  //stampa posizione salvata in memoria
+  Serial.print("Nuova posizione salvata: ");
+  Serial.print(currentPosition);
+  Serial.println(" gradi");
+}
+
+
+void posizione_corrente(int degrees){
+  //aggiorna la posizione corrente del servo
+  currentPosition += degrees;
+
+  //in caso faccio un giro completo azzero
+  while(currentPosition > 360){
+    currentPosition-=360;
+  }
+  while(currentPosition < -360){
+    currentPosition+=360;
+  }
+
+  // salva in memoria
+  preferences.putFloat("position", currentPosition);
+}
+
+
+void ruota(int degrees, int speed){
+  int velDiRotazione=0;
+  int gradi=abs(degrees);//perchè non è il senso movimento non è in base ai gradi ma alla veloctà
+  speed=speed-1;//perche la mat parte da 0
+
+  //in base ai gradi dico se senso orario o antiorario
+  if(speed==20){
+    if(degrees>0){
+      velDiRotazione=20;
+    }
+    else{
+      velDiRotazione=21;
+    }
+  }
+  else if(degrees>0){
+    velDiRotazione=speed+10;
+  }
+  else{
+    velDiRotazione=speed;
+  }
+
+  //ricavo tempo del movimento e velocità
+  float msPerDeg = msPerDegreeTable[speed];
+  float totalTime = msPerDeg * gradi;
+
+  //avvio la rotazione e acquisisco i dati dell'accelerometro
+  myServo.writeMicroseconds(pwmTable[velDiRotazione]);
+  stop=millis()+totalTime;
+  while(millis()<stop){
+    intervallo=millis();
+    acc_val();
+    while(intervallo+CAMPIONAMENTO>millis()){
+      //aspetto per un giusto camionamento
+    }
+  }
+
+  // Ferma il servo
+  myServo.writeMicroseconds(1500);
+
+  //debug
+  posizione_corrente(degrees);
+  Serial.print("Gradi: ");
+  Serial.print(gradi);
+  Serial.print(" Velocita: ");
+  Serial.println(pwmTable[velDiRotazione]);
+  Serial.print("POSIZIONE: ");
+  Serial.print(currentPosition);
+}
+
+
+void acc_val(){
+  //acqioisisco i dati dell'accelerometro nel mio array
+  bmi160.getAccelGyroData(accelGyro);
+
+  //in base alla posizione dell'array prendo vel x,y,z di accelerometro e giroscopio in mm/s^2
+  float ax = accelGyro[3] * accScale;
+  float ay = accelGyro[4] * accScale;
+  float az = accelGyro[5] * accScale;
+
+  // filtro passa-alto (per togliere g)
+  ax_filtered = alpha * (ax_filtered + ax - ax_last);
+  ay_filtered = alpha * (ay_filtered + ay - ay_last);
+  az_filtered = alpha * (az_filtered + az - az_last);
+
+
+  // salvo per dopo
+  //forse servirà
+  ax_last = ax;
+  ay_last = ay;
+  az_last = az;
+
+  //stampo val 
+  Serial.print("Mov X: ");
+  Serial.print(ax_filtered);
+  Serial.print("  Y: ");
+  Serial.print(ay_filtered);
+  Serial.print("  Z: ");
+  Serial.println(az_filtered);
+  
+}
+
+
