@@ -15,48 +15,65 @@ typedef struct{
   unsigned long temp;
 }Accelerazione;
 
-//creo l'oggetto accelerometro (per poter ricavare le informazioni da esso)
-DFRobot_BMI160 bmi160;
-//creo l'oggetto servomotore (per dare i comandi)
-Servo myServo;
+
+
+//I/O
+
 //creo l'oggetto per le preferences per salvare in memoria le variabili (funziona come una sorta di hasmap)
 Preferences preferences;
-
-//indirizzo seriale i2c
-const int8_t i2c_addr = 0x69;
-
-//constanti pin sensori
-//pin per il servo
-const int pinServo  = 14;
 
 //costanti  varie per la gestione degli input
 const String EXIT = "ESC";
 const String FINE = "FINE";
-const int N_CAMPIONAMENTI = 3;
 
-// costante per la conversione in °/s 
-float gyroScale = 2000.0 / 32768.0; 
 
-//variabili per l'accelerometro
-int8_t rslt;
-int16_t accelGyro[6] = {0};
-Accelerazione accelerezioni[N_CAMPIONAMENTI];
- 
+//SERVO
 
-//variabile per il servo memoriza la posizione del servomotore
-float currentPosition = 0.0;
+//creo l'oggetto servomotore (per dare i comandi)
+Servo myServo;
 
+//pin per il servo
+const int pinServo  = 14;
 
 //matrice per i tempi espressi ms per i ms che il servo impiega a fare 1 grado a quella velocità
-float msPerDegreeTable[10] = { 1000, 20, 16, 12, 10, 8, 6, 5, 4, 3 };
+const float msPerDegreeTable[10] = { 1000, 20, 16, 12, 10, 8, 6, 5, 4, 3 };
 
 //velocità impostate del servomotore
 //                      1     2     3     4     5    6     7     8     9     10
-int pwmTable[22] =  { 1400, 1300, 1200, 1100, 1000, 900,  800,  700,  600,  500,
+const int pwmTable[22] =  { 1400, 1300, 1200, 1100, 1000, 900,  800,  700,  600,  500,
                       1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500,
 //                     11    12    13    14    15    16    17    18    19    20
                       1566, 1435};
 //                    or    anor
+
+//variabile per il servo memoriza la posizione del servomotore
+float currentPosition = 0.0;
+
+//ACCELEROMETRO
+
+//creo l'oggetto accelerometro (per poter ricavare le informazioni da esso)
+DFRobot_BMI160 bmi160;
+
+//indirizzo seriale i2c
+const int8_t i2c_addr = 0x69;
+
+//numero campionamenti in una rotazione
+const int N_CAMPIONAMENTI = 10;
+
+// costante per la conversione in °/s 
+const float gyroScale = 2000.0 / 32768.0;
+
+//variabili per l'accelerometro
+int8_t rslt;
+int16_t accelGyro[6] = {0};
+
+//array per i dati dell'accelerometro
+Accelerazione accelerezioni[N_CAMPIONAMENTI];
+
+
+
+
+
 
 void setup() {
   //inizializza porta seriale
@@ -91,13 +108,17 @@ void loop() {
   String comando=leggi("Inserisci (1)-MUOVI (2)-CALIBRA (3)-VAI IN HOME");
   //converte in intero il comando scelto
   int scelta=comando.toInt();
-  //debug 
   
+
+  //debug 
+  /*
   Serial.print("selezione: ");
   Serial.print(scelta);
   Serial.print(" inserito: ");
   Serial.println(comando);
-  
+  */
+
+
   comando.clear();
   switch(scelta){
     case 1:
@@ -120,15 +141,103 @@ void loop() {
       break;
 
   }
+}
+
+//FUNZIONI I/O
+
+String leggi(String prompt) {
+  Serial.println(prompt);
+  Serial.print("> ");
+
+  while (true) {
+    if (Serial.available() > 0) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();  // rimuove spazi e newline
+      if (input.length() > 0) {
+        return input;
+      }
+    }
+  }
+}
+
+void errore(){
+  Serial.println("Formato errato");
+}
+
+void stampaArray(){
+  for(int i=0;i<N_CAMPIONAMENTI;i++){
+    Serial.print("lettura: ");Serial.print(i);
+    stampaStruct(accelerezioni[i]);
+  }
+}
+
+void stampaStruct(Accelerazione a){
+  Serial.print("X: "); Serial.print(a.x); Serial.print(" °/s  ");
+  Serial.print("Y: "); Serial.print(a.y); Serial.print(" °/s  ");
+  Serial.print("Z: "); Serial.print(a.z);Serial.print(" °/s  ");
+  Serial.print("temp:");Serial.print(a.temp);Serial.println(" ms ");
+}
+
+
+  //FUNZIONI MATEMATICHE/FORMULE
+
+void max(){
+  Accelerazione max[3]={0};
+  for(Accelerazione a: accelerezioni){
+    if(fabs(max[0].x)<fabs(a.x)){
+      max[0]=a;
+    }
+    if(fabs(max[1].y)<fabs(a.y)){
+      max[1]=a;
+    }
+    if(fabs(max[2].z)<fabs(a.z)){
+      max[2]=a;
+    }
+  }
+  Serial.println("\nmax x:");
+  stampaStruct(max[0]);//stampa la struct di max rispetto x
+  Serial.println("max y:");
+  stampaStruct(max[1]);//stampa la struct di max rispetto y
+  Serial.println("max z:");
+  stampaStruct(max[2]);//stampa la struct di max rispetto z
+}
+void min(){
+  Accelerazione min[3]={accelerezioni[0],accelerezioni[0],accelerezioni[0]};
+  for(Accelerazione a: accelerezioni){
+    if(fabs(min[0].x)>fabs(a.x)){
+      min[0]=a;
+    }
+    if(fabs(min[1].y)>fabs(a.y)){
+      min[1]=a;
+    }
+    if(fabs(min[2].z)>fabs(a.z)){
+      min[2]=a;
+    }
+  }
+  Serial.println("\n min x:");
+  stampaStruct(min[0]);//stampa la struct di max rispetto x
+  Serial.println("min y:");
+  stampaStruct(min[1]);//stampa la struct di max rispetto y
+  Serial.println("min z:");
+  stampaStruct(min[2]);//stampa la struct di max rispetto z
+}
   
-  //qui andranno i dati dell'acelerometro
+void media(){
+  Accelerazione media={0};
+  for(Accelerazione a: accelerezioni){
+    media.x+=a.x;
+    media.y+=a.y;
+    media.z+=a.z;
+    media.temp=a.temp;
+  }
+  media.x=media.x/N_CAMPIONAMENTI;
+  media.y=media.y/N_CAMPIONAMENTI;
+  media.z=media.z/N_CAMPIONAMENTI;
+  stampaStruct(media);
 }
 
 
-void rth(){
-  //torno alla posizione 0
-  ruota(-(currentPosition),20);
-}
+//FUNZIONI SERVO
 
 
 void muovi(){
@@ -148,7 +257,6 @@ void muovi(){
   }
 }
 
-
 void calibro(){
   while(true){
     //chiedo all'utente in che verso devo muovermi e chiemo imposta 0
@@ -163,6 +271,10 @@ void calibro(){
   }
 }
 
+void rth(){
+  //torno alla posizione 0
+  ruota(-(currentPosition),20);
+}
 
 void imposta_Zero(String verso){
   //in base al verso mi muovo di tot° per dare agio di ripristinadre lo 0
@@ -174,28 +286,6 @@ void imposta_Zero(String verso){
   }
 
 }
-
-
-void errore(){
-  Serial.println("Formato errato");
-}
-
-
-String leggi(String prompt) {
-  Serial.println(prompt);
-  Serial.print("> ");
-
-  while (true) {
-    if (Serial.available() > 0) {
-      String input = Serial.readStringUntil('\n');
-      input.trim();  // rimuove spazi e newline
-      if (input.length() > 0) {
-        return input;
-      }
-    }
-  }
-}
-
 
 void imposta_rotazione(String dati){
   //debug
@@ -245,7 +335,6 @@ void imposta_rotazione(String dati){
   Serial.println(" gradi");
 }
 
-
 void posizione_corrente(int degrees){
   //aggiorna la posizione corrente del servo
   currentPosition += degrees;
@@ -261,7 +350,6 @@ void posizione_corrente(int degrees){
   // salva in memoria
   preferences.putFloat("position", currentPosition);
 }
-
 
 void ruota(int degrees, int speed){
   int velDiRotazione=0;
@@ -322,6 +410,8 @@ void ruota(int degrees, int speed){
 }
 
 
+//FUNZIONI ACCELEROMETRO
+
 void acc_val(int i, float time){
   //acqioisisco i dati dell'accelerometro nel mio array
   bmi160.getAccelGyroData(accelGyro);
@@ -342,75 +432,8 @@ void acc_val(int i, float time){
   Serial.print("Y: "); Serial.print(gy); Serial.print(" °/s  ");
   Serial.print("Z: "); Serial.println(gz);
   */
-  
-  
 }
 
-void max(){
-  Accelerazione max[3]={0};
-  for(Accelerazione a: accelerezioni){
-    if(fabs(max[0].x)<fabs(a.x)){
-      max[0]=a;
-    }
-    if(fabs(max[1].y)<fabs(a.y)){
-      max[1]=a;
-    }
-    if(fabs(max[2].z)<fabs(a.z)){
-      max[2]=a;
-    }
-  }
-  Serial.println("\nmax x:");
-  stampaStruct(max[0]);//stampa la struct di max rispetto x
-  Serial.println("max y:");
-  stampaStruct(max[1]);//stampa la struct di max rispetto y
-  Serial.println("max z:");
-  stampaStruct(max[2]);//stampa la struct di max rispetto z
-}
-void min(){
-  Accelerazione min[3]={accelerezioni[0],accelerezioni[0],accelerezioni[0]};
-  for(Accelerazione a: accelerezioni){
-    if(fabs(min[0].x)>fabs(a.x)){
-      min[0]=a;
-    }
-    if(fabs(min[1].y)>fabs(a.y)){
-      min[1]=a;
-    }
-    if(fabs(min[2].z)>fabs(a.z)){
-      min[2]=a;
-    }
-  }
-  Serial.println("\n min x:");
-  stampaStruct(min[0]);//stampa la struct di max rispetto x
-  Serial.println("min y:");
-  stampaStruct(min[1]);//stampa la struct di max rispetto y
-  Serial.println("min z:");
-  stampaStruct(min[2]);//stampa la struct di max rispetto z
-}
-  
-void media(){
-  Accelerazione media={0};
-  for(Accelerazione a: accelerezioni){
-    media.x+=a.x;
-    media.y+=a.y;
-    media.z+=a.z;
-    media.temp=a.temp;
-  }
-  media.x=media.x/N_CAMPIONAMENTI;
-  media.y=media.y/N_CAMPIONAMENTI;
-  media.z=media.z/N_CAMPIONAMENTI;
-  stampaStruct(media);
-}
 
-void stampaArray(){
-  for(int i=0;i<N_CAMPIONAMENTI;i++){
-    Serial.print("lettura: ");Serial.print(i);
-    stampaStruct(accelerezioni[i]);
-  }
-}
 
-void stampaStruct(Accelerazione a){
-  Serial.print("X: "); Serial.print(a.x); Serial.print(" °/s  ");
-  Serial.print("Y: "); Serial.print(a.y); Serial.print(" °/s  ");
-  Serial.print("Z: "); Serial.print(a.z);Serial.print(" °/s  ");
-  Serial.print("temp:");Serial.print(a.temp);Serial.println(" ms ");
-}
+
