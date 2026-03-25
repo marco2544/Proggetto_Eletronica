@@ -32,7 +32,7 @@ const int pinServo  = 14;
 //costanti  varie per la gestione degli input
 const String EXIT = "ESC";
 const String FINE = "FINE";
-const int N_CAMPIONAMENTI = 10;
+const int N_CAMPIONAMENTI = 3;
 
 // costante per la conversione in °/s 
 float gyroScale = 2000.0 / 32768.0; 
@@ -388,7 +388,17 @@ void min(){
 }
   
 void media(){
-  
+  Accelerazione media={0};
+  for(Accelerazione a: accelerezioni){
+    media.x+=a.x;
+    media.y+=a.y;
+    media.z+=a.z;
+    media.temp=a.temp;
+  }
+  media.x=media.x/N_CAMPIONAMENTI;
+  media.y=media.y/N_CAMPIONAMENTI;
+  media.z=media.z/N_CAMPIONAMENTI;
+  stampaStruct(media);
 }
 
 void stampaArray(){
