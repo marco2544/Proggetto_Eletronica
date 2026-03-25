@@ -24,8 +24,8 @@ const int pinServo  = 14;
 const String EXIT = "ESC";
 const String FINE = "FINE";
 
-// costante per la conversione in m/s^2 
-const float accScale = 9.81 / 16384.0; 
+// costante per la conversione in °/s 
+float gyroScale = 2000.0 / 32768.0; 
 
 //variabili per l'accelerometro
 int8_t rslt;
@@ -38,15 +38,6 @@ const int CAMPIONAMENTO = 50;
 unsigned long stop = 0;
 unsigned long intervallo = 0;
 
-
-// filtro passa-alto per la pulizzia del segnale
-float alpha = 0.9; 
-float ax_filtered = 0,
-      ay_filtered = 0, 
-      az_filtered = 0;
-float ax_last = 0, 
-      ay_last = 0, 
-      az_last = 0;
 
 
 //matrice per i tempi espressi ms per i ms che il servo impiega a fare 1 grado a quella velocità
@@ -320,30 +311,14 @@ void acc_val(){
   bmi160.getAccelGyroData(accelGyro);
 
   //in base alla posizione dell'array prendo vel x,y,z di accelerometro e giroscopio in mm/s^2
-  float ax = accelGyro[3] * accScale;
-  float ay = accelGyro[4] * accScale;
-  float az = accelGyro[5] * accScale;
-
-  // filtro passa-alto (per togliere g)
-  ax_filtered = alpha * (ax_filtered + ax - ax_last);
-  ay_filtered = alpha * (ay_filtered + ay - ay_last);
-  az_filtered = alpha * (az_filtered + az - az_last);
+  float gx = accelGyro[0] * gyroScale;
+  float gy = accelGyro[1] * gyroScale;
+  float gz = accelGyro[2] * gyroScale;
 
 
-  // salvo per dopo
-  //forse servirà
-  ax_last = ax;
-  ay_last = ay;
-  az_last = az;
-
-  //stampo val 
-  Serial.print("Mov X: ");
-  Serial.print(ax_filtered);
-  Serial.print("  Y: ");
-  Serial.print(ay_filtered);
-  Serial.print("  Z: ");
-  Serial.println(az_filtered);
+  // stampo val giroscopio in °/s
+  Serial.print("Gyro X: "); Serial.print(gx); Serial.print(" °/s  ");
+  Serial.print("Y: "); Serial.print(gy); Serial.print(" °/s  ");
+  Serial.print("Z: "); Serial.println(gz);
   
 }
-
-
