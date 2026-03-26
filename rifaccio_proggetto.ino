@@ -8,6 +8,9 @@
 #include <DFRobot_BMI160.h>
 
 //struttura campionamento accelerometro
+/*permette di salvare ogni lettura 
+  temp si riferisce rispetto all'inizio della rotazione
+  { x [°/S rispetto a X], y [°/S rispetto a Y], z [°/S rispetto a Z], temp [momento della lettura]}  */
 typedef struct {
   float x;
   float y;
@@ -35,12 +38,17 @@ Servo myServo;
 //pin per il servo
 const int pinServo = 14;
 
+//costanti per la rotazione
+const int N_VELOCITA = 20;
+const int N_TEMPI = 10;
+
+
 //matrice per i tempi espressi ms per i ms che il servo impiega a fare 1 grado a quella velocità
-const float msPerDegreeTable[10] = { 1000, 20, 16, 12, 10, 8, 6, 5, 4, 3 };
+const float msPerDegreeTable[N_TEMPI] = { 1000, 20, 16, 12, 10, 8, 6, 5, 4, 3 };
 
 //velocità impostate del servomotore
 //                      1     2     3     4     5    6     7     8     9     10
-const int pwmTable[22] = { 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500,
+const int pwmTable[N_VELOCITA + 2] = { 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500,
                            1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500,
                            //                     11    12    13    14    15    16    17    18    19    20
                            1566, 1435 };
@@ -146,6 +154,14 @@ void loop() {
 
 //FUNZIONI I/O
 
+/*  funzione che serve per richiedere un input da tastiera
+  PARAMETRI:
+  [messagio](String): è una stringa che riporta il messaggio che si vuol far apparire all'utente
+  VARIABILI:
+  [input](String): è una variabile che uso per salvarmi quello che l'utente immette
+  RETURN:
+  restituisco una stringa già trimmata che contiene l'input da tastiera
+  */
 String leggi_input_tastiera(String messaggio) {
   Serial.println(messaggio);
   Serial.print("> ");
@@ -161,10 +177,21 @@ String leggi_input_tastiera(String messaggio) {
   }
 }
 
+//stampa errori se richiamata per errori di sintassi          
 void stampa_errore() {
   Serial.println("Formato errato");
 }
 
+/*  gestisce la visualizazione dell'array dei campionamenti
+  COSTANTI:
+  [N_CAMPIONAMENTI](int): richiamo la costante che è il numero esatto di campionamenti in una rotazione
+
+  VARIABILI:
+  [i](int): contatore per sfogliare l'array
+  [accelerezioni[]](Accelerazione): è il mio array che contiene tutti i N_CAMPIONAMENTI
+
+  FUNZIONI:
+  stampaStruct([ELEMENTO](Accelerazione)):richiamo la funzione per la stampa di un elemento               */
 void stampaAccelerazioni() {
   for (int i = 0; i < N_CAMPIONAMENTI; i++) {
     Serial.print("lettura: ");
@@ -173,6 +200,10 @@ void stampaAccelerazioni() {
   }
 }
 
+
+/*  permette di visualizzare un elemento di tipo accelerazione [a]
+  PARAMETRI:
+  [a](Accelerazione): un qualunque elemento di tipo accelerazione che vuole essere visualizzato       */
 void stampaStruct(Accelerazione a) {
   Serial.print("X: ");
   Serial.print(a.x);
@@ -188,6 +219,12 @@ void stampaStruct(Accelerazione a) {
   Serial.println(" ms ");
 }
 
+/*  gestisce la visualizzazione delle tre accelerazioni massime (massima rispetto x, rispetto y, rispettoz)
+  PARAMETRI:
+  [max[3]](Accelerazione): richiede un array di 3 elementi e ne gestisce la visualizazione
+  
+  FUNZIONI:
+  stampaStruct([elemento](Accelerazione)):la richiamo per la stampa di ogni singolo elemento                        */
 void stampaMax(Accelerazione max[3]) {
   Serial.println("\nmax x:");
   stampaStruct(max[0]);
@@ -199,6 +236,12 @@ void stampaMax(Accelerazione max[3]) {
   stampaStruct(max[2]);
 }
 
+/*  gestisce la visualizzazione delle tre accelerazioni minime (minime rispetto x, rispetto y, rispettoz)
+  PARAMETRI:
+  [min[3]](Accelerazione): richiede un array di 3 elementi e ne gestisce la visualizazione
+  
+  FUNZIONI:
+  stampaStruct([elemento](Accelerazione)):la richiamo per la stampa di ogni singolo elemento                        */
 void stampaMin(Accelerazione min[3]) {
   Serial.println("\n min x:");
   stampaStruct(min[0]);  //stampa la struct di max rispetto x
@@ -216,8 +259,8 @@ void stampaInfo() {
   stampaAccelerazioni();
 }
 
-
 //FUNZIONI MATEMATICHE/FORMULE
+
 
 void max() {
   Accelerazione max[3] = { 0 };
@@ -237,6 +280,7 @@ void max() {
   // chiamata al metodo di stampa il massimo
   stampaMax(max);
 }
+
 void min() {
   Accelerazione min[3] = { accelerezioni[0], accelerezioni[0], accelerezioni[0] };
   for (Accelerazione a : accelerezioni) {
@@ -464,3 +508,16 @@ void acquisisciDatiAccelerometr(int i, float time) {
   Serial.print("Z: "); Serial.println(gz);
   */
 }
+
+/*  "breve descrizione"
+  PARAMETRI:
+
+  COSTANTI:
+
+  VARIABILI:
+
+  FUNZIONI:
+*/
+
+
+
