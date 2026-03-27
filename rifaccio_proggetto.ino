@@ -193,10 +193,14 @@ void stampa_errore() {
   FUNZIONI:
   stampaStruct([ELEMENTO](Accelerazione)):richiamo la funzione per la stampa di un elemento               */
 void stampaAccelerazioni() {
-  for (int i = 0; i < N_CAMPIONAMENTI; i++) {
-    Serial.print("lettura: ");
-    Serial.print(i);
-    stampaStruct(accelerezioni[i]);
+  String scelta = leggi_input_tastiera("vuoi visualizzare tutte le letture? (y/n)");//da provare
+  scelta.trim();
+  if(scelta.equalsIgnoreCase("y")){
+    for (int i = 0; i < N_CAMPIONAMENTI; i++) {
+      Serial.print("lettura: ");
+      Serial.print(i);
+      stampaStruct(accelerezioni[i]);
+    }
   }
 }
 
@@ -251,17 +255,30 @@ void stampaMin(Accelerazione min[3]) {
   stampaStruct(min[2]);  //stampa la struct di max rispetto z
 }
 
+/*  si occupa di gestire la visualizzazione dei dati dell'accelerometro
+  FUNZIONI:
+  [max](void):  si occupa di calcolare laccelerazione massima sui vari assi e a sua volta chiama un metodo per stamparla
+  [min](void):  si occupa di calcolare laccelerazione minima sui vari assi e a sua volta chiama un metodo per stamparla
+  [media](void):  si occupa di calcolare laccelerazione media sui vari assi e a sua volta chiama un metodo per stamparla
+  [stampaAccelerazioni](void):  chiede all'utenete se vuole visualizzare tutte le accelerazioni
+*/
 void stampaInfo() {
   max();
   min();
   media();
-  //da chiedere se la vuole visualizare
   stampaAccelerazioni();
 }
 
 //FUNZIONI MATEMATICHE/FORMULE
 
+/*  calcola l'accelerazione rotazionale massima per ogni asse (x, y, z)
+  
+  VARIABILI:
+  [max[3]](Accelerazione): è un array che contiene i 3 oggetti accelerazione uno per ogni asse
 
+  FUNZIONI:
+  [stampaMax](void): gestisce la stampa dei vari elementi
+*/
 void max() {
   Accelerazione max[3] = { 0 };
 
@@ -281,6 +298,14 @@ void max() {
   stampaMax(max);
 }
 
+/*  calcola l'accelerazione rotazionale minima per ogni asse (x, y, z)
+  
+  VARIABILI:
+  [min[3]](Accelerazione): è un array che contiene i 3 oggetti accelerazione uno per ogni asse
+
+  FUNZIONI:
+  [stampaMin](void): gestisce la stampa dei vari elementi
+*/
 void min() {
   Accelerazione min[3] = { accelerezioni[0], accelerezioni[0], accelerezioni[0] };
   for (Accelerazione a : accelerezioni) {
@@ -299,6 +324,14 @@ void min() {
   stampaMin(min);
 }
 
+/*  calcola l'accelerazione rotazionale minima per ogni asse (x, y, z)
+  
+  VARIABILI:
+  [media](Accelerazione): è oggetto di tipo accelerazione che mi serve per sommare tutte le accelerazioni lette e farne la media
+
+  FUNZIONI:
+  [stampaStruct](void): gestisce la stampa della media(in questo caso)
+*/
 void media() {
   Accelerazione media = { 0 };
   for (Accelerazione a : accelerezioni) {
@@ -316,6 +349,16 @@ void media() {
 
 //FUNZIONI SERVO
 
+/*  permette all'utende di scrivere quanto ruotare in che direzione e a che velocità
+  COSTANTI:
+  [EXIT](String): è una costante che contiene la frase per ritornare al menu principale
+
+  VARIABILI:
+  [comando](String): permette di salvare la scelta fatta dall'utente
+
+  FUNZIONI:
+  [pulisciInput()](void):permette di gestire l'imput dell'utente per dare al servomotore i comandi giusti
+*/
 void inputServo() {
   while (true) {
     //prendo in input di quanti gradi devo ruotare e la velocità
@@ -333,6 +376,16 @@ void inputServo() {
   }
 }
 
+/*  serve a reimpostare lo 0 del servomotore
+  COSTANTI:
+  [FINE](String):è una costante che coincide con il comando per interrompere e salvare la calibrazione
+
+  VARIABILI:
+  [comando](String): permette di salvare la scelta fatta dall'utente
+
+  FUNZIONI:
+  [impostaZero()](void):richiama la funzione che mi permette di resettare la posizione del servomotore
+*/
 void calibraServo() {
   while (true) {
     //chiedo all'utente in che verso devo muovermi e chiemo imposta 0
@@ -347,11 +400,24 @@ void calibraServo() {
   }
 }
 
+/*  ritorna alla posizione 0  (Return to Home)
+  FUNZIONI:
+  [ruota()](void):permette al braccio di ruotare dei gradi che servono per tornare alla posizione 0
+*/
 void rth() {
   //torno alla posizione 0
   ruota(-(currentPosition), 20);
 }
 
+/*  "breve descrizione"
+  PARAMETRI:
+
+  COSTANTI:
+
+  VARIABILI:
+
+  FUNZIONI:
+*/
 void impostaZero(String verso) {
   //in base al verso mi muovo di tot° per dare agio di ripristinadre lo 0
   if (verso.equalsIgnoreCase("+")) {
@@ -361,11 +427,23 @@ void impostaZero(String verso) {
   }
 }
 
-//ripulisce input dei dati per il servo e chiama [ruota] che muove il servo
+/*  ripulisce input dei dati per il servo in modo da separare le stringhe
+  PARAMETRI:
+  [dati](String):ci permette di passare una stringa che sarà poi separata e analizzata
+
+  VARIABILI:
+  [degrees](int): salva la conversione da dati per dire al servo quanto ruotare
+  [vel](int):  salva la conversione da dati per dire al servo a che velocità ruotare
+
+  FUNZIONI:
+  [stampa_errore()](void): stampa errori in caso di input errati
+  [ruota()](void): invio le informazioni per avviare la rotazione del servo
+*/
 void pulisciInput(String dati) {
   //debug
   //Serial.println(dati);
-
+  int degrees:
+  int vel;
   //controllo comando non sia vuoto
   if (dati.length() == 0) {
     return;
@@ -383,8 +461,8 @@ void pulisciInput(String dati) {
   }
 
   //divido la stringa per i vari dati ([gradi] [velocità])
-  int degrees = dati.substring(0, spazzi).toInt();
-  int vel = dati.substring(spazzi + 1).toInt();
+  degrees = dati.substring(0, spazzi).toInt();
+  vel = dati.substring(spazzi + 1).toInt();
 
   //controllo che la velocità abbia il giusto range
   if ((vel < 1 || vel > 10)) {
@@ -396,10 +474,8 @@ void pulisciInput(String dati) {
 
   // Muove il servo
   ruota(degrees, vel);
-
-  //stampo i gradi e la velocità
-  //debug
-  /*
+/*debug
+  stampo i gradi e la velocità
   Serial.print("Gradi: ");
   Serial.print(degrees);
   Serial.print(" Velocita: ");
@@ -412,6 +488,14 @@ void pulisciInput(String dati) {
   */
 }
 
+/*  utilizza le preferences per salvare in memoria la posizione del servo
+  PARAMETRI:
+  [degrees](int): valore da sommare alla posizione corrente
+
+  VARIABILI:
+  [currentPosition](float):salva la posizione corrente del servo e poi la scrive in preferences
+  FUNZIONI:
+*/
 void posizioneCorrente(int degrees) {
   //aggiorna la posizione corrente del servo
   currentPosition += degrees;
@@ -428,6 +512,27 @@ void posizioneCorrente(int degrees) {
   preferences.putFloat("position", currentPosition);
 }
 
+/*  gestisce la corretta rotazione del servomotore e lancia la lettura dell'accelerometro 
+  PARAMETRI:
+  [degrees](int): contiene di quanti gradi ruotare
+  [speed](int):  imposta la velocità di rotazione
+
+  COSTANTI:
+  [N_CAMPIONAMENTI](int): quanti campionamenti fare in una rotazione
+
+  VARIABILI:
+  [velDiRotazione](int): la posizione della velocità selezionata del nostro array delle velocità
+  [gradi](int): quanti gradi ruotare
+  [msPerDeg](float): con la velocità impostata quanti millisecondi ci metto a fare un grado
+  [totalTime](float): quanti ms ci metto a fare i gradi impostati
+  [stop](unsigned long): momento in cui devo stoppare il servomotore
+  [start](unsigned long): momento in cui inizio la rotazione 
+  [intervallo](unsigned long): serve per salvare il tempo in cui campiono per metterlo nell'array
+  [campionamento](float): ogni quanto tempo campionare 
+
+  FUNZIONI:
+  [acquisisciDatiAccelerometr](void): serve per lanciare una lettura dell'accelerometro
+*/
 void ruota(int degrees, int speed) {
   int velDiRotazione = 0;
   int gradi = abs(degrees);  //perchè non è il senso movimento non è in base ai gradi ma alla veloctà
@@ -470,10 +575,8 @@ void ruota(int degrees, int speed) {
   myServo.writeMicroseconds(1500);
   //stampaInfo();
 
-
-
-  //debug
-  /*
+/*debug
+  
   posizioneCorrente(degrees);
   Serial.print("Gradi: ");
   Serial.print(gradi);
@@ -487,6 +590,22 @@ void ruota(int degrees, int speed) {
 
 //FUNZIONI ACCELEROMETRO
 
+/*  gestisce la lettura dei dati dell'accelerometro e li inserisce in un array di tipo Accelerazione
+  PARAMETRI:
+  [i](int): posizione della lettura
+  [time](float):momento della lettura dei dati
+
+  COSTANTI:
+  [gyroScale](float): costante per conversione in °/s
+
+  VARIABILI:
+  [bmi160](DFRobot_BMI160):oggetto che comanda le funzione dell'accelerometro
+  [accelGyro](int16_t): array che salva la lettura sia di accelerometro in posizioni (x=3, y=4, z=5) e per il giroscopio nelle posizioni (x=0, y=1, z=2)
+  [gx](float): salva l'accelerazione convertita rispetto all'asse x
+  [gy](float): salva l'accelerazione convertita rispetto all'asse y
+  [gz](float): salva l'accelerazione convertita rispetto all'asse z
+  [accelerezioni[]](Accelerazione): è l'array che contiene tutte le letture di questa rotazione
+*/
 void acquisisciDatiAccelerometr(int i, float time) {
   //acqioisisco i dati dell'accelerometro nel mio array
   bmi160.getAccelGyroData(accelGyro);
@@ -499,25 +618,11 @@ void acquisisciDatiAccelerometr(int i, float time) {
   accelerezioni[i].y = accelGyro[1] * gyroScale;
   accelerezioni[i].z = accelGyro[2] * gyroScale;
   accelerezioni[i].temp = time;
-
-  // stampo val giroscopio in °/s
-  //debug
-  /*
+/*debug
+  stampo val giroscopio in °/s
   Serial.print("Gyro X: "); Serial.print(gx); Serial.print(" °/s  ");
   Serial.print("Y: "); Serial.print(gy); Serial.print(" °/s  ");
-  Serial.print("Z: "); Serial.println(gz);
-  */
+  Serial.print("Z: "); Serial.println(gz);*/
+  
+  
 }
-
-/*  "breve descrizione"
-  PARAMETRI:
-
-  COSTANTI:
-
-  VARIABILI:
-
-  FUNZIONI:
-*/
-
-
-
