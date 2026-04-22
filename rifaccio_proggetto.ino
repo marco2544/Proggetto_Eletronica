@@ -64,12 +64,21 @@ DFRobot_BMI160 bmi160;
 
 //indirizzo seriale i2c
 const int8_t i2c_addr = 0x69;
+const int LETTURA=1;  //1 PER LEGGERE I GRADI AL SECONDO 0 PER LEGGERE I MS
 
 //numero campionamenti in una rotazione
 const int N_CAMPIONAMENTI = 10;
 
 // costante per la conversione in °/s
 const float gyroScale = 2000.0 / 32768.0;
+
+// costante per la conversione in m/s^2
+const float accScale = 9.81 / 16384.0; // conversione in m/s^2
+
+// filtro passa-alto
+float alpha = 0.9; 
+float ax_filtered = 0, ay_filtered = 0, az_filtered = 0;
+float ax_last = 0, ay_last = 0, az_last = 0;
 
 //variabili per l'accelerometro
 int8_t rslt;
@@ -442,7 +451,7 @@ void impostaZero(String verso) {
 void pulisciInput(String dati) {
   //debug
   //Serial.println(dati);
-  int degrees:
+  int degrees;
   int vel;
   //controllo comando non sia vuoto
   if (dati.length() == 0) {
@@ -562,14 +571,20 @@ void ruota(int degrees, int speed) {
   unsigned long intervallo = 0;
   unsigned long start = millis();
   float campionamento = totalTime / N_CAMPIONAMENTI;
-  while (millis() < stop) {
-    intervallo = millis();
-    acquisisciDatiAccelerometr(i, intervallo - start);
-    i++;
-    while (intervallo + campionamento > millis()) {
-      //aspetto per un giusto camionamento
+  if(LETTURA==1){
+    while (millis() < stop) {
+      intervallo = millis();
+      acquisisciDatiGiroscopio(i, intervallo - start);
+      i++;
+      while (intervallo + campionamento > millis()) {
+        //aspetto per un giusto camionamento
+      }
     }
   }
+  else if(LETTURA==0){
+
+  }
+  
 
   // Ferma il servo
   myServo.writeMicroseconds(1500);
@@ -606,14 +621,11 @@ void ruota(int degrees, int speed) {
   [gz](float): salva l'accelerazione convertita rispetto all'asse z
   [accelerezioni[]](Accelerazione): è l'array che contiene tutte le letture di questa rotazione
 */
-void acquisisciDatiAccelerometr(int i, float time) {
+void acquisisciDatiGiroscopio(int i, float time) {
   //acqioisisco i dati dell'accelerometro nel mio array
   bmi160.getAccelGyroData(accelGyro);
-
+  
   //in base alla posizione dell'array prendo vel x,y,z di accelerometro e giroscopio in mm/s^2
-  float gx = accelGyro[0] * gyroScale;
-  float gy = accelGyro[1] * gyroScale;
-  float gz = accelGyro[2] * gyroScale;
   accelerezioni[i].x = accelGyro[0] * gyroScale;
   accelerezioni[i].y = accelGyro[1] * gyroScale;
   accelerezioni[i].z = accelGyro[2] * gyroScale;
@@ -625,4 +637,27 @@ void acquisisciDatiAccelerometr(int i, float time) {
   Serial.print("Z: "); Serial.println(gz);*/
   
   
+}
+
+void acquisisciDatiAccelerometro(int i, float time){
+   bmi160.getAccelGyroData(accelGyro);
+
+  float ax = accelGyro[3] * accScale;
+  float ay = accelGyro[4] * accScale;
+  float az = accelGyro[5] * accScale;
+
+  // filtro passa-alto
+  ax_filtered = alpha * (ax_filtered + ax - ax_last);
+  ay_filtered = alpha * (ay_filtered + ay - ay_last);
+  az_filtered = alpha * (az_filtered + az - az_last);
+
+  ax_last = ax;
+  ay_last = ay;
+  az_last = az;
+
+  accelerezioni[i].x = ax_filtered;
+  accelerezioni[i].y = ay_filtered;
+  accelerezioni[i].z = az_filtered;
+  accelerezioni[i].temp = time;
+
 }
